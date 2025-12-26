@@ -87,8 +87,9 @@ export async function POST(request: NextRequest) {
         countdown.pausedAt = null;
         countdown.pauseReason = "";
         countdown.totalPausedDuration = 0;
-        // Reset executed status on scheduled pauses
-        countdown.scheduledPauses = countdown.scheduledPauses.map(p => ({ ...p, executed: false }));
+        if (countdown.scheduledPauses) {
+          countdown.scheduledPauses = countdown.scheduledPauses.map(p => ({ ...p, executed: false }));
+        }
         break;
 
       case "end":
@@ -105,7 +106,6 @@ export async function POST(request: NextRequest) {
 
     await countdown.save();
 
-    // Log
     try {
       const log = new CountdownLogModel({
         action,
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
         newState: countdown.toObject(),
       });
       await log.save();
-    } catch { /* ignore log errors */ }
+    } catch { /* ignore */ }
 
     return NextResponse.json(countdown);
   } catch (error) {
@@ -137,10 +137,32 @@ export async function PUT(request: NextRequest) {
     if (!countdown) {
       countdown = new CountdownModel({ ...DEFAULT_COUNTDOWN_STATE, ...body });
     } else {
-      Object.assign(countdown, body);
+      // Deep merge for nested objects
+      if (body.theme) countdown.theme = { ...countdown.theme, ...body.theme };
+      if (body.statusStyles) countdown.statusStyles = { ...countdown.statusStyles, ...body.statusStyles };
+      if (body.display) countdown.display = { ...countdown.display, ...body.display };
+      if (body.fonts) countdown.fonts = { ...countdown.fonts, ...body.fonts };
+      if (body.progressBar) countdown.progressBar = { ...countdown.progressBar, ...body.progressBar };
+      
+      // Simple fields
+      if (body.eventName !== undefined) countdown.eventName = body.eventName;
+      if (body.startTime !== undefined) countdown.startTime = body.startTime;
+      if (body.duration !== undefined) countdown.duration = body.duration;
+      if (body.message !== undefined) countdown.message = body.message;
+      if (body.scheduledPauses !== undefined) countdown.scheduledPauses = body.scheduledPauses;
     }
 
     await countdown.save();
+
+    try {
+      const log = new CountdownLogModel({
+        action: "update",
+        timestamp: new Date(),
+        newState: countdown.toObject(),
+      });
+      await log.save();
+    } catch { /* ignore */ }
+
     return NextResponse.json(countdown);
   } catch (error) {
     console.error("Error:", error);

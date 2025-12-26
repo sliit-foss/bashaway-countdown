@@ -66,7 +66,7 @@ export function useCountdown(pollInterval = 5000) {
     }
     
     const total = Math.max(0, countdown.duration - elapsed);
-    const progress = Math.min(100, (elapsed / countdown.duration) * 100);
+    const progress = Math.min(100, Math.max(0, (elapsed / countdown.duration) * 100));
 
     return {
       days: Math.floor(total / (1000 * 60 * 60 * 24)),
@@ -74,15 +74,12 @@ export function useCountdown(pollInterval = 5000) {
       minutes: Math.floor((total / (1000 * 60)) % 60),
       seconds: Math.floor((total / 1000) % 60),
       total,
-      elapsed,
+      elapsed: Math.max(0, elapsed),
       progress,
     };
   }, [countdown]);
 
-  useEffect(() => {
-    fetchCountdown();
-  }, [fetchCountdown]);
-
+  useEffect(() => { fetchCountdown(); }, [fetchCountdown]);
   useEffect(() => {
     const pollId = setInterval(fetchCountdown, pollInterval);
     return () => clearInterval(pollId);
