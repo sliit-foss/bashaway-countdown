@@ -122,7 +122,9 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
   const [fonts, setFonts] = useState<FontConfig>(countdown.fonts || DEFAULT_FONT_CONFIG);
   
   // Progress bar
-  const [progressBar, setProgressBar] = useState(countdown.progressBar);
+  const [progressBar, setProgressBar] = useState(countdown.progressBar || {
+    height: 6, borderRadius: 3, showLabels: true, backgroundColor: "rgba(255,255,255,0.1)", fillColor: "#EF4444"
+  });
   
   // Scheduled pauses
   const [scheduledPauses, setScheduledPauses] = useState<ScheduledPause[]>([]);
@@ -138,15 +140,15 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
   // Sync form state
   useEffect(() => {
     if (countdown) {
-      setEventName(countdown.eventName);
-      setMessage(countdown.message);
-      setTheme(countdown.theme);
+      setEventName(countdown.eventName || "Bashaway 2025");
+      setMessage(countdown.message || "");
+      setTheme(countdown.theme || { primaryColor: "#EF4444", backgroundColor: "#0a0a0a", textColor: "#FFFFFF", accentColor: "#F59E0B" });
       setStatusStyles(countdown.statusStyles || DEFAULT_STATUS_STYLES);
       setDisplay(countdown.display || DEFAULT_DISPLAY_CONFIG);
       setFonts(countdown.fonts || DEFAULT_FONT_CONFIG);
-      setProgressBar(countdown.progressBar);
+      setProgressBar(countdown.progressBar || { height: 6, borderRadius: 3, showLabels: true, backgroundColor: "rgba(255,255,255,0.1)", fillColor: "#EF4444" });
       setScheduledPauses(countdown.scheduledPauses || []);
-      setDurationInput(formatDuration(countdown.duration));
+      setDurationInput(formatDuration(countdown.duration || 6 * 60 * 60 * 1000));
       
       if (countdown.startTime) {
         const date = new Date(countdown.startTime);

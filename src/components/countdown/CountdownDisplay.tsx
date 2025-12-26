@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Pause } from "lucide-react";
 import Image from "next/image";
 import { useCountdown } from "@/hooks/useCountdown";
-import { formatDuration } from "@/types/countdown";
+import { formatDuration, DEFAULT_STATUS_STYLES, DEFAULT_DISPLAY_CONFIG, DEFAULT_FONT_CONFIG } from "@/types/countdown";
 
 function TimeUnit({ value, label, font }: { value: number; label: string; font: string }) {
   return (
@@ -47,10 +47,16 @@ function Separator({ color }: { color: string }) {
 export default function CountdownDisplay() {
   const { countdown, timeRemaining, loading } = useCountdown(3000);
   
-  const { theme, statusStyles, display, fonts, progressBar } = countdown;
-  const currentStatusStyle = statusStyles[countdown.status];
-  const isDarkBg = theme.backgroundColor.toLowerCase().includes("0a") || 
-                   theme.backgroundColor.toLowerCase().includes("00") ||
+  // Use defaults for missing fields (handles old DB records)
+  const theme = countdown.theme || { primaryColor: "#EF4444", backgroundColor: "#0a0a0a", textColor: "#FFFFFF", accentColor: "#F59E0B" };
+  const statusStyles = countdown.statusStyles || DEFAULT_STATUS_STYLES;
+  const display = countdown.display || DEFAULT_DISPLAY_CONFIG;
+  const fonts = countdown.fonts || DEFAULT_FONT_CONFIG;
+  const progressBar = countdown.progressBar || { height: 6, borderRadius: 3, showLabels: true, backgroundColor: "rgba(255,255,255,0.1)", fillColor: "#EF4444" };
+  
+  const currentStatusStyle = statusStyles[countdown.status] || DEFAULT_STATUS_STYLES[countdown.status];
+  const isDarkBg = theme.backgroundColor?.toLowerCase().includes("0a") || 
+                   theme.backgroundColor?.toLowerCase().includes("00") ||
                    theme.backgroundColor === "#000000";
 
   if (loading) {
