@@ -66,7 +66,23 @@ export async function POST(request: NextRequest) {
           countdown.isPaused = true;
           countdown.pausedAt = new Date();
           countdown.pauseReason = data.reason || "Paused";
+          countdown.scheduledPauseAt = null; // Clear any scheduled pause
         }
+        break;
+
+      case "schedule_pause":
+        // Schedule a pause for a future time (don't pause now)
+        if (countdown.status === "running" && data.pauseAt) {
+          countdown.scheduledPauseAt = new Date(data.pauseAt);
+          // Store the reason for when it triggers
+          if (data.reason) {
+            countdown.message = `Scheduled: ${data.reason}`;
+          }
+        }
+        break;
+
+      case "cancel_scheduled_pause":
+        countdown.scheduledPauseAt = null;
         break;
 
       case "resume":
@@ -149,6 +165,8 @@ export async function PUT(request: NextRequest) {
       if (body.startTime !== undefined) countdown.startTime = body.startTime;
       if (body.duration !== undefined) countdown.duration = body.duration;
       if (body.message !== undefined) countdown.message = body.message;
+      if (body.pausePrefix !== undefined) countdown.pausePrefix = body.pausePrefix;
+      if (body.scheduledPauseAt !== undefined) countdown.scheduledPauseAt = body.scheduledPauseAt;
       if (body.scheduledPauses !== undefined) countdown.scheduledPauses = body.scheduledPauses;
     }
 

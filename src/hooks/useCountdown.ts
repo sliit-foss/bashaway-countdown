@@ -79,11 +79,35 @@ export function useCountdown(pollInterval = 5000) {
     };
   }, [countdown]);
 
+  const checkScheduledPause = useCallback(async () => {
+    if (countdown.scheduledPauseAt && countdown.status === "running") {
+      const scheduledTime = new Date(countdown.scheduledPauseAt).getTime();
+      const now = Date.now();
+      
+      if (now >= scheduledTime) {
+        try {
+          await fetch("/api/countdown", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ action: "pause", reason: countdown.message?.replace("Scheduled: ", "") || "Scheduled pause" }),
+          });
+          fetchCountdown();
+        } catch {}
+      }
+    }
+  }, [countdown.scheduledPauseAt, countdown.status, countdown.message, fetchCountdown]);
+
   useEffect(() => { fetchCountdown(); }, [fetchCountdown]);
   useEffect(() => {
     const pollId = setInterval(fetchCountdown, pollInterval);
     return () => clearInterval(pollId);
   }, [fetchCountdown, pollInterval]);
+  
+  // Check for scheduled pauses every second
+  useEffect(() => {
+    const checkId = setInterval(checkScheduledPause, 1000);
+    return () => clearInterval(checkId);
+  }, [checkScheduledPause]);
 
   useEffect(() => {
     const updateTime = () => setTimeRemaining(calculateTimeRemaining());

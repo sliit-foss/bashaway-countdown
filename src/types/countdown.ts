@@ -46,6 +46,8 @@ export interface CountdownState {
   isPaused: boolean;
   pausedAt: Date | null;
   pauseReason: string;
+  pausePrefix: string; // e.g., "Paused for", "Paused due to", etc.
+  scheduledPauseAt: Date | null; // Future time to pause
   totalPausedDuration: number;
   scheduledPauses: ScheduledPause[];
   status: "not_started" | "running" | "paused" | "ended";
@@ -156,6 +158,8 @@ export const DEFAULT_COUNTDOWN_STATE: CountdownState = {
   isPaused: false,
   pausedAt: null,
   pauseReason: "",
+  pausePrefix: "Paused for",
+  scheduledPauseAt: null,
   totalPausedDuration: 0,
   scheduledPauses: [],
   status: "not_started",

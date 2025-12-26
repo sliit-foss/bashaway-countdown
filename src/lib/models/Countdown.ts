@@ -29,6 +29,8 @@ const CountdownSchema = new Schema<CountdownDocument>(
     isPaused: { type: Boolean, default: false },
     pausedAt: { type: Date, default: null },
     pauseReason: { type: String, default: "" },
+    pausePrefix: { type: String, default: "Paused for" },
+    scheduledPauseAt: { type: Date, default: null },
     totalPausedDuration: { type: Number, default: 0 },
     scheduledPauses: { type: [ScheduledPauseSchema], default: [] },
     status: {
