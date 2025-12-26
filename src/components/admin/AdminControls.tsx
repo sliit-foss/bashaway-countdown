@@ -20,6 +20,7 @@ import {
   XCircle,
   Eye,
   EyeOff,
+  LogOut,
 } from "lucide-react";
 import { useCountdownAdmin } from "@/hooks/useCountdown";
 import { CountdownLog } from "@/types/countdown";
@@ -157,7 +158,11 @@ function Card({ title, icon, children, className }: CardProps) {
   );
 }
 
-export default function AdminControls() {
+interface AdminControlsProps {
+  onLogout?: () => void;
+}
+
+export default function AdminControls({ onLogout }: AdminControlsProps) {
   const {
     countdown,
     loading,
@@ -351,6 +356,15 @@ export default function AdminControls() {
                 <Eye className="w-4 h-4" />
                 View Display
               </a>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Logout
+                </button>
+              )}
             </div>
           </div>
         </div>

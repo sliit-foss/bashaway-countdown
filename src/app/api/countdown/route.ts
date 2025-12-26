@@ -4,10 +4,27 @@ import CountdownModel, { CountdownDocument } from "@/lib/models/Countdown";
 import CountdownLogModel from "@/lib/models/CountdownLog";
 import { DEFAULT_COUNTDOWN_STATE } from "@/types/countdown";
 
+// Helper to ensure DB connection
+async function ensureConnection() {
+  try {
+    await dbConnect();
+    return true;
+  } catch (error) {
+    console.error("Database connection failed:", error);
+    return false;
+  }
+}
+
 // GET - Fetch current countdown state
 export async function GET() {
   try {
-    await dbConnect();
+    const connected = await ensureConnection();
+    if (!connected) {
+      return NextResponse.json(
+        { error: "Database connection failed", ...DEFAULT_COUNTDOWN_STATE },
+        { status: 503 }
+      );
+    }
 
     let countdown = await CountdownModel.findOne().sort({ createdAt: -1 });
 
@@ -21,7 +38,7 @@ export async function GET() {
   } catch (error) {
     console.error("Error fetching countdown:", error);
     return NextResponse.json(
-      { error: "Failed to fetch countdown" },
+      { error: "Failed to fetch countdown", ...DEFAULT_COUNTDOWN_STATE },
       { status: 500 }
     );
   }
@@ -30,7 +47,13 @@ export async function GET() {
 // POST - Create or update countdown
 export async function POST(request: NextRequest) {
   try {
-    await dbConnect();
+    const connected = await ensureConnection();
+    if (!connected) {
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 503 }
+      );
+    }
 
     const body = await request.json();
     const { action, ...data } = body;
@@ -120,15 +143,20 @@ export async function POST(request: NextRequest) {
     }
 
     // Log the action
-    const log = new CountdownLogModel({
-      action,
-      timestamp: new Date(),
-      reason: data.reason,
-      performedBy: data.performedBy || "admin",
-      previousState,
-      newState: countdown?.toObject(),
-    });
-    await log.save();
+    try {
+      const log = new CountdownLogModel({
+        action,
+        timestamp: new Date(),
+        reason: data.reason,
+        performedBy: data.performedBy || "admin",
+        previousState,
+        newState: countdown?.toObject(),
+      });
+      await log.save();
+    } catch (logError) {
+      console.error("Failed to save log:", logError);
+      // Don't fail the main operation if logging fails
+    }
 
     return NextResponse.json(countdown);
   } catch (error) {
@@ -143,7 +171,13 @@ export async function POST(request: NextRequest) {
 // PUT - Update countdown settings
 export async function PUT(request: NextRequest) {
   try {
-    await dbConnect();
+    const connected = await ensureConnection();
+    if (!connected) {
+      return NextResponse.json(
+        { error: "Database connection failed" },
+        { status: 503 }
+      );
+    }
 
     const body = await request.json();
 
