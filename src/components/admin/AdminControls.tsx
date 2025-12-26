@@ -4,159 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { twMerge } from "tailwind-merge";
 import {
-  Play,
-  Pause,
-  RotateCcw,
-  Square,
-  Save,
-  RefreshCw,
-  Settings,
-  Palette,
-  MessageSquare,
-  Clock,
-  History,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Eye,
-  EyeOff,
-  LogOut,
+  Play, Pause, RotateCcw, Square, Save, RefreshCw, Clock, History,
+  CheckCircle, XCircle, Eye, LogOut, Plus, Trash2, Calendar, Timer,
 } from "lucide-react";
 import { useCountdownAdmin } from "@/hooks/useCountdown";
-import { CountdownLog } from "@/types/countdown";
-
-interface ButtonProps {
-  onClick: () => void;
-  disabled?: boolean;
-  variant?: "primary" | "secondary" | "danger" | "success" | "warning";
-  children: React.ReactNode;
-  className?: string;
-  loading?: boolean;
-}
-
-function Button({
-  onClick,
-  disabled,
-  variant = "primary",
-  children,
-  className,
-  loading,
-}: ButtonProps) {
-  const variants = {
-    primary: "bg-red-500 hover:bg-red-600 text-white",
-    secondary: "bg-gray-700 hover:bg-gray-600 text-white",
-    danger: "bg-rose-600 hover:bg-rose-700 text-white",
-    success: "bg-emerald-500 hover:bg-emerald-600 text-white",
-    warning: "bg-amber-500 hover:bg-amber-600 text-black",
-  };
-
-  return (
-    <motion.button
-      whileHover={{ scale: disabled ? 1 : 1.02 }}
-      whileTap={{ scale: disabled ? 1 : 0.98 }}
-      onClick={onClick}
-      disabled={disabled || loading}
-      className={twMerge(
-        "px-6 py-3 rounded-xl font-semibold transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed",
-        variants[variant],
-        className
-      )}
-    >
-      {loading ? (
-        <RefreshCw className="w-5 h-5 animate-spin" />
-      ) : (
-        children
-      )}
-    </motion.button>
-  );
-}
-
-interface InputProps {
-  label: string;
-  type?: string;
-  value: string;
-  onChange: (value: string) => void;
-  placeholder?: string;
-  className?: string;
-}
-
-function Input({
-  label,
-  type = "text",
-  value,
-  onChange,
-  placeholder,
-  className,
-}: InputProps) {
-  return (
-    <div className={twMerge("flex flex-col gap-2", className)}>
-      <label className="text-sm font-medium text-gray-300">{label}</label>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent transition-all"
-      />
-    </div>
-  );
-}
-
-interface ColorPickerProps {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-}
-
-function ColorPicker({ label, value, onChange }: ColorPickerProps) {
-  return (
-    <div className="flex items-center gap-4">
-      <label className="text-sm font-medium text-gray-300 min-w-[120px]">
-        {label}
-      </label>
-      <div className="flex items-center gap-2">
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="w-12 h-12 rounded-lg cursor-pointer border-2 border-gray-700"
-        />
-        <input
-          type="text"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white font-mono text-sm w-28 focus:outline-none focus:ring-2 focus:ring-red-500"
-        />
-      </div>
-    </div>
-  );
-}
-
-interface CardProps {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
-  className?: string;
-}
-
-function Card({ title, icon, children, className }: CardProps) {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={twMerge(
-        "bg-gray-900/50 backdrop-blur-sm border border-gray-800 rounded-2xl p-6",
-        className
-      )}
-    >
-      <div className="flex items-center gap-3 mb-6">
-        <div className="p-2 bg-red-500/10 rounded-lg text-red-500">{icon}</div>
-        <h3 className="text-lg font-semibold text-white">{title}</h3>
-      </div>
-      {children}
-    </motion.div>
-  );
-}
+import { CountdownLog, ScheduledPause, parseDuration, formatDuration } from "@/types/countdown";
 
 interface AdminControlsProps {
   onLogout?: () => void;
@@ -164,65 +16,50 @@ interface AdminControlsProps {
 
 export default function AdminControls({ onLogout }: AdminControlsProps) {
   const {
-    countdown,
-    loading,
-    saving,
-    error,
-    refetch,
-    start,
-    pause,
-    resume,
-    reset,
-    end,
-    updateSettings,
+    countdown, loading, saving, error, refetch, start, pause, resume, reset, end, updateSettings, performAction,
   } = useCountdownAdmin();
 
   const [eventName, setEventName] = useState("");
-  const [targetDate, setTargetDate] = useState("");
-  const [targetTime, setTargetTime] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [startTimeInput, setStartTimeInput] = useState("");
+  const [durationInput, setDurationInput] = useState("");
   const [message, setMessage] = useState("");
-  const [showMessage, setShowMessage] = useState(true);
+  const [showMessage, setShowMessage] = useState(false);
   const [pauseReason, setPauseReason] = useState("");
-  const [theme, setTheme] = useState({
-    primaryColor: "#EF4444",
-    backgroundColor: "#0F0F0F",
-    textColor: "#FFFFFF",
-    accentColor: "#F97316",
-  });
+  const [theme, setTheme] = useState(countdown.theme);
   const [logs, setLogs] = useState<CountdownLog[]>([]);
-  const [activeTab, setActiveTab] = useState<"controls" | "settings" | "theme" | "logs">("controls");
-  const [notification, setNotification] = useState<{
-    type: "success" | "error";
-    message: string;
-  } | null>(null);
+  const [notification, setNotification] = useState<{ type: "success" | "error"; message: string } | null>(null);
+  
+  // Scheduled pause form
+  const [scheduledPauses, setScheduledPauses] = useState<ScheduledPause[]>([]);
+  const [newPauseReason, setNewPauseReason] = useState("");
+  const [newPauseTimeType, setNewPauseTimeType] = useState<"absolute" | "offset">("offset");
+  const [newPauseTime, setNewPauseTime] = useState("");
+  const [newPauseOffset, setNewPauseOffset] = useState("");
+  const [newPauseDuration, setNewPauseDuration] = useState("30m");
 
-  // Sync form state with countdown data
   useEffect(() => {
     if (countdown) {
       setEventName(countdown.eventName);
       setMessage(countdown.message);
       setShowMessage(countdown.showMessage);
       setTheme(countdown.theme);
-
-      if (countdown.targetTime) {
-        const date = new Date(countdown.targetTime);
-        setTargetDate(date.toISOString().split("T")[0]);
-        setTargetTime(date.toTimeString().slice(0, 5));
+      setScheduledPauses(countdown.scheduledPauses || []);
+      setDurationInput(formatDuration(countdown.duration));
+      
+      if (countdown.startTime) {
+        const date = new Date(countdown.startTime);
+        setStartDate(date.toISOString().split("T")[0]);
+        setStartTimeInput(date.toTimeString().slice(0, 5));
       }
     }
   }, [countdown]);
 
-  // Fetch logs
   const fetchLogs = useCallback(async () => {
     try {
       const response = await fetch("/api/countdown/logs");
-      if (response.ok) {
-        const data = await response.json();
-        setLogs(data);
-      }
-    } catch (err) {
-      console.error("Failed to fetch logs:", err);
-    }
+      if (response.ok) setLogs(await response.json());
+    } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
@@ -231,573 +68,440 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
     return () => clearInterval(interval);
   }, [fetchLogs]);
 
-  const showNotification = (type: "success" | "error", message: string) => {
+  const notify = (type: "success" | "error", message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleAction = async (action: () => Promise<unknown>, successMsg: string) => {
+  const handleAction = async (action: () => Promise<unknown>, msg: string) => {
     try {
       await action();
-      showNotification("success", successMsg);
+      notify("success", msg);
       fetchLogs();
     } catch {
-      showNotification("error", "Action failed. Please try again.");
+      notify("error", "Action failed");
     }
   };
 
-  const handleSaveSettings = async () => {
-    const targetDateTime = new Date(`${targetDate}T${targetTime}`);
+  const handleSave = async () => {
+    const startDateTime = new Date(`${startDate}T${startTimeInput}`);
+    const duration = parseDuration(durationInput) || countdown.duration;
+    
     await handleAction(
-      () =>
-        updateSettings({
-          eventName,
-          targetTime: targetDateTime,
-          message,
-          showMessage,
-          theme,
-        }),
-      "Settings saved successfully!"
+      () => updateSettings({ eventName, startTime: startDateTime, duration, message, showMessage, theme, scheduledPauses }),
+      "Saved!"
     );
   };
 
-  const handlePause = async () => {
-    await handleAction(
-      () => pause(pauseReason || "Paused"),
-      "Countdown paused"
-    );
-    setPauseReason("");
+  const addScheduledPause = () => {
+    const duration = parseDuration(newPauseDuration);
+    if (!duration || !newPauseReason) return notify("error", "Fill all fields");
+    
+    const newPause: ScheduledPause = {
+      id: Date.now().toString(),
+      reason: newPauseReason,
+      startTime: newPauseTimeType === "absolute" && newPauseTime ? new Date(`${startDate}T${newPauseTime}`) : null,
+      startOffset: newPauseTimeType === "offset" ? parseDuration(newPauseOffset) : null,
+      duration,
+      executed: false,
+    };
+    
+    if (newPauseTimeType === "offset" && !newPause.startOffset) return notify("error", "Invalid offset");
+    if (newPauseTimeType === "absolute" && !newPause.startTime) return notify("error", "Invalid time");
+    
+    setScheduledPauses([...scheduledPauses, newPause]);
+    setNewPauseReason("");
+    setNewPauseTime("");
+    setNewPauseOffset("");
+    setNewPauseDuration("30m");
+  };
+
+  const removeScheduledPause = (id: string) => {
+    setScheduledPauses(scheduledPauses.filter(p => p.id !== id));
+  };
+
+  const executePause = async (pause: ScheduledPause) => {
+    await handleAction(() => performAction("pause", { reason: pause.reason }), `Paused: ${pause.reason}`);
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-950 flex items-center justify-center">
-        <motion.div
-          animate={{ rotate: 360 }}
-          transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        >
-          <RefreshCw className="w-12 h-12 text-red-500" />
-        </motion.div>
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <RefreshCw className="w-8 h-8 text-red-500 animate-spin" />
       </div>
     );
   }
 
-  const statusColors = {
-    not_started: "bg-gray-500",
-    running: "bg-emerald-500",
-    paused: "bg-amber-500",
-    ended: "bg-rose-500",
-  };
-
-  const tabs = [
-    { id: "controls", label: "Controls", icon: <Play className="w-4 h-4" /> },
-    { id: "settings", label: "Settings", icon: <Settings className="w-4 h-4" /> },
-    { id: "theme", label: "Theme", icon: <Palette className="w-4 h-4" /> },
-    { id: "logs", label: "Activity Log", icon: <History className="w-4 h-4" /> },
-  ];
+  const statusColor = {
+    not_started: "bg-zinc-600", running: "bg-emerald-500", paused: "bg-amber-500", ended: "bg-red-500",
+  }[countdown.status];
 
   return (
-    <div className="min-h-screen bg-gray-950 text-white">
+    <div className="min-h-screen bg-[#0a0a0a] text-white">
       {/* Notification */}
       <AnimatePresence>
         {notification && (
           <motion.div
-            initial={{ opacity: 0, y: -50 }}
+            initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -50 }}
+            exit={{ opacity: 0, y: -20 }}
             className={twMerge(
-              "fixed top-4 right-4 z-50 px-6 py-4 rounded-xl flex items-center gap-3 shadow-2xl",
-              notification.type === "success"
-                ? "bg-emerald-500 text-white"
-                : "bg-rose-500 text-white"
+              "fixed top-4 right-4 z-50 px-4 py-3 rounded-lg flex items-center gap-2 text-sm font-medium",
+              notification.type === "success" ? "bg-emerald-500" : "bg-red-500"
             )}
           >
-            {notification.type === "success" ? (
-              <CheckCircle className="w-5 h-5" />
-            ) : (
-              <XCircle className="w-5 h-5" />
-            )}
+            {notification.type === "success" ? <CheckCircle className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
             {notification.message}
           </motion.div>
         )}
       </AnimatePresence>
 
       {/* Header */}
-      <header className="border-b border-gray-800 bg-gray-900/50 backdrop-blur-sm sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-bold text-white">Bashaway Admin</h1>
-              <div
-                className={twMerge(
-                  "px-3 py-1 rounded-full text-xs font-semibold uppercase tracking-wider",
-                  statusColors[countdown.status]
-                )}
-              >
-                {countdown.status.replace("_", " ")}
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <Button
-                variant="secondary"
-                onClick={refetch}
-                disabled={saving}
-                className="!py-2"
-              >
-                <RefreshCw className="w-4 h-4" />
-                Refresh
-              </Button>
-              <a
-                href="/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-4 py-2 bg-gray-800 hover:bg-gray-700 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
-              >
-                <Eye className="w-4 h-4" />
-                View Display
-              </a>
-              {onLogout && (
-                <button
-                  onClick={onLogout}
-                  className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-xl text-sm font-medium flex items-center gap-2 transition-colors"
-                >
-                  <LogOut className="w-4 h-4" />
-                  Logout
-                </button>
-              )}
-            </div>
+      <header className="border-b border-zinc-800 bg-zinc-900/50 sticky top-0 z-40 backdrop-blur-sm">
+        <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-xl font-bold">Bashaway</h1>
+            <span className={twMerge("px-2 py-0.5 rounded text-xs font-medium uppercase", statusColor)}>
+              {countdown.status.replace("_", " ")}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={refetch} className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
+              <RefreshCw className="w-4 h-4" />
+            </button>
+            <a href="/" target="_blank" className="p-2 hover:bg-zinc-800 rounded-lg transition-colors">
+              <Eye className="w-4 h-4" />
+            </a>
+            {onLogout && (
+              <button onClick={onLogout} className="p-2 hover:bg-zinc-800 rounded-lg text-red-400 transition-colors">
+                <LogOut className="w-4 h-4" />
+              </button>
+            )}
           </div>
         </div>
       </header>
 
-      {/* Tabs */}
-      <div className="border-b border-gray-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <nav className="flex gap-1 py-2">
-            {tabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as typeof activeTab)}
-                className={twMerge(
-                  "px-4 py-3 rounded-xl text-sm font-medium flex items-center gap-2 transition-all",
-                  activeTab === tab.id
-                    ? "bg-red-500/10 text-red-500"
-                    : "text-gray-400 hover:text-white hover:bg-gray-800"
-                )}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
         {error && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            className="mb-6 p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl flex items-center gap-3 text-rose-400"
-          >
-            <AlertTriangle className="w-5 h-5" />
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg text-red-400 text-sm">
             {error}
-          </motion.div>
+          </div>
         )}
 
-        <AnimatePresence mode="wait">
-          {activeTab === "controls" && (
-            <motion.div
-              key="controls"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+        {/* Quick Controls */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">Controls</h2>
+          <div className="flex flex-wrap gap-3">
+            {countdown.status === "not_started" && (
+              <button
+                onClick={() => handleAction(start, "Started!")}
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                <Play className="w-4 h-4" /> Start Event
+              </button>
+            )}
+            {countdown.status === "running" && (
+              <>
+                <button
+                  onClick={() => handleAction(() => pause(pauseReason || "Manual pause"), "Paused!")}
+                  disabled={saving}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-black rounded-lg font-medium transition-colors disabled:opacity-50"
+                >
+                  <Pause className="w-4 h-4" /> Pause
+                </button>
+                <input
+                  type="text"
+                  value={pauseReason}
+                  onChange={(e) => setPauseReason(e.target.value)}
+                  placeholder="Pause reason (optional)"
+                  className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm flex-1 min-w-[200px] focus:outline-none focus:border-zinc-600"
+                />
+              </>
+            )}
+            {countdown.status === "paused" && (
+              <button
+                onClick={() => handleAction(resume, "Resumed!")}
+                disabled={saving}
+                className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 rounded-lg font-medium transition-colors disabled:opacity-50"
+              >
+                <Play className="w-4 h-4" /> Resume
+              </button>
+            )}
+            <button
+              onClick={() => handleAction(reset, "Reset!")}
+              disabled={saving || countdown.status === "not_started"}
+              className="flex items-center gap-2 px-4 py-2.5 bg-zinc-700 hover:bg-zinc-600 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {/* Quick Actions */}
-              <Card title="Quick Actions" icon={<Play className="w-5 h-5" />}>
-                <div className="grid grid-cols-2 gap-4">
-                  {countdown.status === "not_started" && (
-                    <Button
-                      variant="success"
-                      onClick={() => handleAction(start, "Countdown started!")}
-                      disabled={saving}
-                      loading={saving}
-                      className="col-span-2"
-                    >
-                      <Play className="w-5 h-5" />
-                      Start Countdown
-                    </Button>
-                  )}
-
-                  {countdown.status === "running" && (
-                    <Button
-                      variant="warning"
-                      onClick={handlePause}
-                      disabled={saving}
-                      loading={saving}
-                      className="col-span-2"
-                    >
-                      <Pause className="w-5 h-5" />
-                      Pause Countdown
-                    </Button>
-                  )}
-
-                  {countdown.status === "paused" && (
-                    <Button
-                      variant="success"
-                      onClick={() => handleAction(resume, "Countdown resumed!")}
-                      disabled={saving}
-                      loading={saving}
-                      className="col-span-2"
-                    >
-                      <Play className="w-5 h-5" />
-                      Resume Countdown
-                    </Button>
-                  )}
-
-                  <Button
-                    variant="secondary"
-                    onClick={() => handleAction(reset, "Countdown reset!")}
-                    disabled={saving || countdown.status === "not_started"}
-                    loading={saving}
-                  >
-                    <RotateCcw className="w-5 h-5" />
-                    Reset
-                  </Button>
-
-                  <Button
-                    variant="danger"
-                    onClick={() => handleAction(end, "Countdown ended!")}
-                    disabled={saving || countdown.status === "ended"}
-                    loading={saving}
-                  >
-                    <Square className="w-5 h-5" />
-                    End Event
-                  </Button>
-                </div>
-
-                {/* Pause Reason Input */}
-                {countdown.status === "running" && (
-                  <div className="mt-6">
-                    <Input
-                      label="Pause Reason (optional)"
-                      value={pauseReason}
-                      onChange={setPauseReason}
-                      placeholder="e.g., Lunch Break, Technical Issue"
-                    />
-                  </div>
-                )}
-              </Card>
-
-              {/* Current Status */}
-              <Card title="Current Status" icon={<Clock className="w-5 h-5" />}>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center py-3 border-b border-gray-800">
-                    <span className="text-gray-400">Event Name</span>
-                    <span className="font-medium">{countdown.eventName}</span>
-                  </div>
-                  <div className="flex justify-between items-center py-3 border-b border-gray-800">
-                    <span className="text-gray-400">Target Time</span>
-                    <span className="font-medium font-mono">
-                      {new Date(countdown.targetTime).toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center py-3 border-b border-gray-800">
-                    <span className="text-gray-400">Status</span>
-                    <span
-                      className={twMerge(
-                        "px-3 py-1 rounded-full text-xs font-semibold uppercase",
-                        statusColors[countdown.status]
-                      )}
-                    >
-                      {countdown.status.replace("_", " ")}
-                    </span>
-                  </div>
-                  {countdown.startedAt && (
-                    <div className="flex justify-between items-center py-3 border-b border-gray-800">
-                      <span className="text-gray-400">Started At</span>
-                      <span className="font-medium font-mono">
-                        {new Date(countdown.startedAt).toLocaleString()}
-                      </span>
-                    </div>
-                  )}
-                  {countdown.isPaused && countdown.pausedAt && (
-                    <>
-                      <div className="flex justify-between items-center py-3 border-b border-gray-800">
-                        <span className="text-gray-400">Paused At</span>
-                        <span className="font-medium font-mono">
-                          {new Date(countdown.pausedAt).toLocaleString()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center py-3 border-b border-gray-800">
-                        <span className="text-gray-400">Pause Reason</span>
-                        <span className="font-medium text-amber-400">
-                          {countdown.pauseReason}
-                        </span>
-                      </div>
-                    </>
-                  )}
-                  <div className="flex justify-between items-center py-3">
-                    <span className="text-gray-400">Total Paused Duration</span>
-                    <span className="font-medium font-mono">
-                      {Math.floor(countdown.totalPausedDuration / 1000 / 60)} min
-                    </span>
-                  </div>
-                </div>
-              </Card>
-            </motion.div>
-          )}
-
-          {activeTab === "settings" && (
-            <motion.div
-              key="settings"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+              <RotateCcw className="w-4 h-4" /> Reset
+            </button>
+            <button
+              onClick={() => handleAction(end, "Ended!")}
+              disabled={saving || countdown.status === "ended"}
+              className="flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 rounded-lg font-medium transition-colors disabled:opacity-50"
             >
-              {/* Event Settings */}
-              <Card title="Event Settings" icon={<Settings className="w-5 h-5" />}>
-                <div className="space-y-6">
-                  <Input
-                    label="Event Name"
-                    value={eventName}
-                    onChange={setEventName}
-                    placeholder="Bashaway 2025"
+              <Square className="w-4 h-4" /> End
+            </button>
+          </div>
+        </section>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Event Settings */}
+          <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">Event Settings</h2>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1.5">Event Name</label>
+                <input
+                  type="text"
+                  value={eventName}
+                  onChange={(e) => setEventName(e.target.value)}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1.5">Start Date</label>
+                  <input
+                    type="date"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
                   />
-                  <div className="grid grid-cols-2 gap-4">
-                    <Input
-                      label="Target Date"
-                      type="date"
-                      value={targetDate}
-                      onChange={setTargetDate}
-                    />
-                    <Input
-                      label="Target Time"
-                      type="time"
-                      value={targetTime}
-                      onChange={setTargetTime}
-                    />
-                  </div>
                 </div>
-              </Card>
+                <div>
+                  <label className="block text-xs text-zinc-500 mb-1.5">Start Time</label>
+                  <input
+                    type="time"
+                    value={startTimeInput}
+                    onChange={(e) => setStartTimeInput(e.target.value)}
+                    className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs text-zinc-500 mb-1.5">Duration (e.g., 6h, 3h 30m, 180m)</label>
+                <input
+                  type="text"
+                  value={durationInput}
+                  onChange={(e) => setDurationInput(e.target.value)}
+                  placeholder="6h"
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
+                />
+              </div>
+              <div>
+                <label className="flex items-center gap-2 text-xs text-zinc-500 mb-1.5">
+                  <input
+                    type="checkbox"
+                    checked={showMessage}
+                    onChange={(e) => setShowMessage(e.target.checked)}
+                    className="rounded"
+                  />
+                  Show Message
+                </label>
+                <input
+                  type="text"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="Message to display"
+                  disabled={!showMessage}
+                  className="w-full px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600 disabled:opacity-50"
+                />
+              </div>
+            </div>
+          </section>
 
-              {/* Message Settings */}
-              <Card title="Display Message" icon={<MessageSquare className="w-5 h-5" />}>
-                <div className="space-y-6">
-                  <div className="flex items-center justify-between">
-                    <span className="text-gray-300">Show Message</span>
+          {/* Theme */}
+          <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4">Theme</h2>
+            <div className="space-y-3">
+              {[
+                { key: "primaryColor", label: "Primary" },
+                { key: "backgroundColor", label: "Background" },
+                { key: "textColor", label: "Text" },
+                { key: "accentColor", label: "Accent" },
+              ].map(({ key, label }) => (
+                <div key={key} className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={theme[key as keyof typeof theme]}
+                    onChange={(e) => setTheme({ ...theme, [key]: e.target.value })}
+                    className="w-8 h-8 rounded cursor-pointer border border-zinc-700"
+                  />
+                  <span className="text-sm text-zinc-400 w-20">{label}</span>
+                  <input
+                    type="text"
+                    value={theme[key as keyof typeof theme]}
+                    onChange={(e) => setTheme({ ...theme, [key]: e.target.value })}
+                    className="flex-1 px-2 py-1 bg-zinc-800 border border-zinc-700 rounded text-xs font-mono focus:outline-none focus:border-zinc-600"
+                  />
+                </div>
+              ))}
+            </div>
+            {/* Mini Preview */}
+            <div
+              className="mt-4 p-4 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: theme.backgroundColor }}
+            >
+              <span className="text-2xl font-bold font-mono" style={{ color: theme.textColor }}>
+                12:34:56
+              </span>
+            </div>
+          </section>
+        </div>
+
+        {/* Scheduled Pauses */}
+        <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+          <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+            <Calendar className="w-4 h-4" /> Scheduled Pauses
+          </h2>
+          
+          {/* Add new pause */}
+          <div className="flex flex-wrap gap-3 mb-4 p-3 bg-zinc-800/50 rounded-lg">
+            <input
+              type="text"
+              value={newPauseReason}
+              onChange={(e) => setNewPauseReason(e.target.value)}
+              placeholder="Reason (e.g., Lunch Break)"
+              className="flex-1 min-w-[150px] px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
+            />
+            <select
+              value={newPauseTimeType}
+              onChange={(e) => setNewPauseTimeType(e.target.value as "absolute" | "offset")}
+              className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
+            >
+              <option value="offset">After start</option>
+              <option value="absolute">At time</option>
+            </select>
+            {newPauseTimeType === "offset" ? (
+              <input
+                type="text"
+                value={newPauseOffset}
+                onChange={(e) => setNewPauseOffset(e.target.value)}
+                placeholder="e.g., 3h"
+                className="w-24 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
+              />
+            ) : (
+              <input
+                type="time"
+                value={newPauseTime}
+                onChange={(e) => setNewPauseTime(e.target.value)}
+                className="px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
+              />
+            )}
+            <input
+              type="text"
+              value={newPauseDuration}
+              onChange={(e) => setNewPauseDuration(e.target.value)}
+              placeholder="Duration"
+              className="w-24 px-3 py-2 bg-zinc-800 border border-zinc-700 rounded-lg text-sm focus:outline-none focus:border-zinc-600"
+            />
+            <button
+              onClick={addScheduledPause}
+              className="flex items-center gap-1 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 rounded-lg text-sm font-medium transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Add
+            </button>
+          </div>
+
+          {/* List */}
+          {scheduledPauses.length === 0 ? (
+            <p className="text-zinc-500 text-sm">No scheduled pauses</p>
+          ) : (
+            <div className="space-y-2">
+              {scheduledPauses.map((p) => (
+                <div key={p.id} className="flex items-center gap-3 p-3 bg-zinc-800/50 rounded-lg">
+                  <Timer className="w-4 h-4 text-zinc-500" />
+                  <span className="font-medium text-sm">{p.reason}</span>
+                  <span className="text-xs text-zinc-500">
+                    {p.startOffset ? `+${formatDuration(p.startOffset)}` : p.startTime ? new Date(p.startTime).toLocaleTimeString() : ""}
+                  </span>
+                  <span className="text-xs text-zinc-500">for {formatDuration(p.duration)}</span>
+                  {p.executed && <span className="text-xs text-emerald-400">✓ Done</span>}
+                  <div className="flex-1" />
+                  {!p.executed && countdown.status === "running" && (
                     <button
-                      onClick={() => setShowMessage(!showMessage)}
-                      className={twMerge(
-                        "p-2 rounded-lg transition-colors",
-                        showMessage
-                          ? "bg-emerald-500/20 text-emerald-400"
-                          : "bg-gray-800 text-gray-400"
-                      )}
+                      onClick={() => executePause(p)}
+                      className="px-2 py-1 text-xs bg-amber-500/20 text-amber-400 rounded hover:bg-amber-500/30 transition-colors"
                     >
-                      {showMessage ? (
-                        <Eye className="w-5 h-5" />
-                      ) : (
-                        <EyeOff className="w-5 h-5" />
-                      )}
+                      Execute Now
                     </button>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    <label className="text-sm font-medium text-gray-300">
-                      Message Text
-                    </label>
-                    <textarea
-                      value={message}
-                      onChange={(e) => setMessage(e.target.value)}
-                      placeholder="Enter a message to display..."
-                      rows={3}
-                      className="px-4 py-3 bg-gray-800 border border-gray-700 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-red-500 resize-none"
-                    />
-                  </div>
-                </div>
-              </Card>
-
-              {/* Save Button */}
-              <div className="lg:col-span-2">
-                <Button
-                  variant="primary"
-                  onClick={handleSaveSettings}
-                  disabled={saving}
-                  loading={saving}
-                  className="w-full !py-4 text-lg"
-                >
-                  <Save className="w-5 h-5" />
-                  Save All Settings
-                </Button>
-              </div>
-            </motion.div>
-          )}
-
-          {activeTab === "theme" && (
-            <motion.div
-              key="theme"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="grid grid-cols-1 lg:grid-cols-2 gap-6"
-            >
-              {/* Theme Colors */}
-              <Card title="Theme Colors" icon={<Palette className="w-5 h-5" />}>
-                <div className="space-y-6">
-                  <ColorPicker
-                    label="Primary Color"
-                    value={theme.primaryColor}
-                    onChange={(v) => setTheme({ ...theme, primaryColor: v })}
-                  />
-                  <ColorPicker
-                    label="Background"
-                    value={theme.backgroundColor}
-                    onChange={(v) => setTheme({ ...theme, backgroundColor: v })}
-                  />
-                  <ColorPicker
-                    label="Text Color"
-                    value={theme.textColor}
-                    onChange={(v) => setTheme({ ...theme, textColor: v })}
-                  />
-                  <ColorPicker
-                    label="Accent Color"
-                    value={theme.accentColor}
-                    onChange={(v) => setTheme({ ...theme, accentColor: v })}
-                  />
-                </div>
-              </Card>
-
-              {/* Theme Preview */}
-              <Card title="Preview" icon={<Eye className="w-5 h-5" />}>
-                <div
-                  className="rounded-xl p-8 flex flex-col items-center justify-center min-h-[300px]"
-                  style={{ backgroundColor: theme.backgroundColor }}
-                >
-                  <h3
-                    className="text-2xl font-bold mb-4"
-                    style={{ color: theme.textColor }}
-                  >
-                    {eventName || "Event Name"}
-                  </h3>
-                  <div
-                    className="px-4 py-2 rounded-full text-sm font-semibold mb-6"
-                    style={{
-                      backgroundColor: `${theme.primaryColor}30`,
-                      color: theme.primaryColor,
-                    }}
-                  >
-                    RUNNING
-                  </div>
-                  <div className="flex gap-4">
-                    {["12", "34", "56"].map((num, i) => (
-                      <div
-                        key={i}
-                        className="px-6 py-4 rounded-xl text-3xl font-mono font-bold"
-                        style={{
-                          backgroundColor: `${theme.primaryColor}15`,
-                          color: theme.textColor,
-                          border: `2px solid ${theme.primaryColor}30`,
-                        }}
-                      >
-                        {num}
-                      </div>
-                    ))}
-                  </div>
-                  {showMessage && message && (
-                    <p
-                      className="mt-6 text-sm opacity-70"
-                      style={{ color: theme.textColor }}
-                    >
-                      {message}
-                    </p>
                   )}
+                  <button
+                    onClick={() => removeScheduledPause(p.id)}
+                    className="p-1 text-zinc-500 hover:text-red-400 transition-colors"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-              </Card>
-
-              {/* Save Theme Button */}
-              <div className="lg:col-span-2">
-                <Button
-                  variant="primary"
-                  onClick={handleSaveSettings}
-                  disabled={saving}
-                  loading={saving}
-                  className="w-full !py-4 text-lg"
-                >
-                  <Save className="w-5 h-5" />
-                  Save Theme
-                </Button>
-              </div>
-            </motion.div>
+              ))}
+            </div>
           )}
+        </section>
 
-          {activeTab === "logs" && (
-            <motion.div
-              key="logs"
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-            >
-              <Card title="Activity Log" icon={<History className="w-5 h-5" />}>
-                <div className="space-y-3 max-h-[600px] overflow-y-auto">
-                  {logs.length === 0 ? (
-                    <p className="text-gray-500 text-center py-8">
-                      No activity logged yet
-                    </p>
-                  ) : (
-                    logs.map((log, index) => (
-                      <motion.div
-                        key={log._id || index}
-                        initial={{ opacity: 0, y: 10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }}
-                        className="flex items-start gap-4 p-4 bg-gray-800/50 rounded-xl"
-                      >
-                        <div
-                          className={twMerge(
-                            "p-2 rounded-lg",
-                            log.action === "start" && "bg-emerald-500/20 text-emerald-400",
-                            log.action === "pause" && "bg-amber-500/20 text-amber-400",
-                            log.action === "resume" && "bg-blue-500/20 text-blue-400",
-                            log.action === "reset" && "bg-gray-500/20 text-gray-400",
-                            log.action === "end" && "bg-rose-500/20 text-rose-400",
-                            log.action === "update" && "bg-purple-500/20 text-purple-400"
-                          )}
-                        >
-                          {log.action === "start" && <Play className="w-4 h-4" />}
-                          {log.action === "pause" && <Pause className="w-4 h-4" />}
-                          {log.action === "resume" && <Play className="w-4 h-4" />}
-                          {log.action === "reset" && <RotateCcw className="w-4 h-4" />}
-                          {log.action === "end" && <Square className="w-4 h-4" />}
-                          {log.action === "update" && <Settings className="w-4 h-4" />}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-4">
-                            <span className="font-semibold capitalize">
-                              {log.action}
-                            </span>
-                            <span className="text-xs text-gray-500 font-mono">
-                              {new Date(log.timestamp).toLocaleString()}
-                            </span>
-                          </div>
-                          {log.reason && (
-                            <p className="text-sm text-gray-400 mt-1">
-                              Reason: {log.reason}
-                            </p>
-                          )}
-                        </div>
-                      </motion.div>
-                    ))
-                  )}
+        {/* Save Button */}
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-red-500 hover:bg-red-600 rounded-xl font-semibold transition-colors disabled:opacity-50"
+        >
+          <Save className="w-5 h-5" /> Save All Changes
+        </button>
+
+        {/* Current Status & Logs */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <Clock className="w-4 h-4" /> Current Status
+            </h2>
+            <div className="space-y-2 text-sm">
+              {[
+                ["Status", <span key="s" className={twMerge("px-2 py-0.5 rounded text-xs font-medium", statusColor)}>{countdown.status.replace("_", " ")}</span>],
+                ["Start Time", new Date(countdown.startTime).toLocaleString()],
+                ["Duration", formatDuration(countdown.duration)],
+                countdown.startedAt && ["Started At", new Date(countdown.startedAt).toLocaleString()],
+                countdown.isPaused && ["Paused At", countdown.pausedAt ? new Date(countdown.pausedAt).toLocaleString() : "-"],
+                countdown.isPaused && ["Pause Reason", <span key="pr" className="text-amber-400">{countdown.pauseReason}</span>],
+                ["Total Paused", formatDuration(countdown.totalPausedDuration)],
+              ].filter(Boolean).map((row, i) => (
+                <div key={i} className="flex justify-between py-2 border-b border-zinc-800 last:border-0">
+                  <span className="text-zinc-500">{(row as [string, React.ReactNode])[0]}</span>
+                  <span className="font-mono">{(row as [string, React.ReactNode])[1]}</span>
                 </div>
-              </Card>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              ))}
+            </div>
+          </section>
+
+          <section className="bg-zinc-900 border border-zinc-800 rounded-xl p-5">
+            <h2 className="text-sm font-semibold text-zinc-400 uppercase tracking-wider mb-4 flex items-center gap-2">
+              <History className="w-4 h-4" /> Activity Log
+            </h2>
+            <div className="space-y-2 max-h-[300px] overflow-y-auto">
+              {logs.length === 0 ? (
+                <p className="text-zinc-500 text-sm">No activity yet</p>
+              ) : (
+                logs.slice(0, 20).map((log, i) => (
+                  <div key={log._id || i} className="flex items-center gap-3 py-2 border-b border-zinc-800 last:border-0">
+                    <div className={twMerge(
+                      "w-2 h-2 rounded-full",
+                      log.action === "start" && "bg-emerald-500",
+                      log.action === "pause" && "bg-amber-500",
+                      log.action === "resume" && "bg-blue-500",
+                      log.action === "end" && "bg-red-500",
+                      log.action === "reset" && "bg-zinc-500",
+                      log.action === "update" && "bg-purple-500",
+                    )} />
+                    <span className="text-sm capitalize">{log.action}</span>
+                    {log.reason && <span className="text-xs text-zinc-500">({log.reason})</span>}
+                    <span className="flex-1" />
+                    <span className="text-xs text-zinc-500">{new Date(log.timestamp).toLocaleTimeString()}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+        </div>
       </main>
     </div>
   );
 }
-

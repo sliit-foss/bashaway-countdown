@@ -7,18 +7,15 @@ const CountdownLogSchema = new Schema<CountdownLogDocument>(
   {
     action: {
       type: String,
-      enum: ["start", "pause", "resume", "reset", "update", "end"],
+      enum: ["start", "pause", "resume", "reset", "update", "end", "schedule_pause"],
       required: true,
     },
     timestamp: { type: Date, default: Date.now },
     reason: { type: String },
-    performedBy: { type: String },
     previousState: { type: Schema.Types.Mixed },
     newState: { type: Schema.Types.Mixed },
   },
-  {
-    timestamps: true,
-  }
+  { timestamps: true }
 );
 
 const CountdownLogModel: Model<CountdownLogDocument> =
@@ -26,4 +23,3 @@ const CountdownLogModel: Model<CountdownLogDocument> =
   mongoose.model<CountdownLogDocument>("CountdownLog", CountdownLogSchema);
 
 export default CountdownLogModel;
-

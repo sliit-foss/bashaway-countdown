@@ -1,333 +1,201 @@
 "use client";
 
-import { motion, AnimatePresence } from "framer-motion";
-import { twMerge } from "tailwind-merge";
-import { Pause, Clock, AlertCircle } from "lucide-react";
+import { motion } from "framer-motion";
+import { Pause } from "lucide-react";
 import { useCountdown } from "@/hooks/useCountdown";
+import { formatDuration } from "@/types/countdown";
 
-interface TimeUnitProps {
-  value: number;
-  label: string;
-  primaryColor: string;
-  textColor: string;
-}
-
-function TimeUnit({ value, label, primaryColor, textColor }: TimeUnitProps) {
-  const formattedValue = value.toString().padStart(2, "0");
-
+function TimeUnit({ value, label }: { value: number; label: string }) {
   return (
     <div className="flex flex-col items-center">
-      <motion.div
-        className="relative overflow-hidden rounded-2xl backdrop-blur-sm"
-        style={{
-          background: `linear-gradient(145deg, ${primaryColor}15, ${primaryColor}08)`,
-          border: `2px solid ${primaryColor}30`,
-          boxShadow: `0 0 40px ${primaryColor}20, inset 0 0 30px ${primaryColor}05`,
-        }}
-        whileHover={{ scale: 1.02 }}
-        transition={{ type: "spring", stiffness: 300 }}
-      >
-        <div className="px-6 py-8 sm:px-10 sm:py-12 md:px-14 md:py-16">
-          <AnimatePresence mode="popLayout">
-            <motion.span
-              key={formattedValue}
-              initial={{ y: -40, opacity: 0, scale: 0.8 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 40, opacity: 0, scale: 0.8 }}
-              transition={{ type: "spring", stiffness: 200, damping: 20 }}
-              className="block font-mono text-5xl sm:text-7xl md:text-8xl lg:text-9xl font-black tracking-tighter"
-              style={{ color: textColor }}
-            >
-              {formattedValue}
-            </motion.span>
-          </AnimatePresence>
-        </div>
+      <div className="relative">
         <motion.div
-          className="absolute inset-0 opacity-20"
-          style={{
-            background: `radial-gradient(circle at 50% 0%, ${primaryColor}, transparent 70%)`,
-          }}
-          animate={{
-            opacity: [0.1, 0.25, 0.1],
-          }}
-          transition={{
-            duration: 3,
-            repeat: Infinity,
-            ease: "easeInOut",
-          }}
-        />
-      </motion.div>
-      <span
-        className="mt-4 text-sm sm:text-base md:text-lg font-semibold uppercase tracking-[0.3em] opacity-70"
-        style={{ color: textColor }}
-      >
+          key={value}
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          className="font-mono text-6xl sm:text-8xl md:text-9xl font-black tabular-nums"
+        >
+          {value.toString().padStart(2, "0")}
+        </motion.div>
+      </div>
+      <span className="mt-2 text-xs sm:text-sm font-medium uppercase tracking-[0.2em] opacity-60">
         {label}
       </span>
     </div>
   );
 }
 
-function Separator({ color }: { color: string }) {
+function Separator() {
   return (
-    <div className="flex flex-col gap-4 px-2 sm:px-4">
-      {[0, 1].map((i) => (
-        <motion.div
-          key={i}
-          className="w-3 h-3 sm:w-4 sm:h-4 rounded-full"
-          style={{ backgroundColor: color }}
-          animate={{
-            opacity: [0.3, 1, 0.3],
-            scale: [0.9, 1.1, 0.9],
-          }}
-          transition={{
-            duration: 1,
-            repeat: Infinity,
-            delay: i * 0.2,
-          }}
-        />
-      ))}
+    <div className="flex flex-col gap-3 px-2 sm:px-4 md:px-6 pt-2">
+      <motion.div
+        className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-current opacity-40"
+        animate={{ opacity: [0.2, 0.6, 0.2] }}
+        transition={{ duration: 1, repeat: Infinity }}
+      />
+      <motion.div
+        className="w-2 h-2 sm:w-3 sm:h-3 rounded-full bg-current opacity-40"
+        animate={{ opacity: [0.2, 0.6, 0.2] }}
+        transition={{ duration: 1, repeat: Infinity, delay: 0.3 }}
+      />
     </div>
   );
 }
 
 export default function CountdownDisplay() {
-  const { countdown, timeRemaining, loading, error } = useCountdown(3000);
+  const { countdown, timeRemaining, loading } = useCountdown(3000);
+  const { primaryColor, backgroundColor, textColor, accentColor } = countdown.theme;
 
   if (loading) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: countdown.theme.backgroundColor }}
-      >
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor }}>
         <motion.div
+          className="w-12 h-12 border-4 rounded-full"
+          style={{ borderColor: `${primaryColor}30`, borderTopColor: primaryColor }}
           animate={{ rotate: 360 }}
           transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
-        >
-          <Clock
-            className="w-16 h-16"
-            style={{ color: countdown.theme.primaryColor }}
-          />
-        </motion.div>
+        />
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ backgroundColor: countdown.theme.backgroundColor }}
-      >
-        <div className="text-center">
-          <AlertCircle
-            className="w-16 h-16 mx-auto mb-4"
-            style={{ color: countdown.theme.primaryColor }}
-          />
-          <p style={{ color: countdown.theme.textColor }}>{error}</p>
-        </div>
-      </div>
-    );
-  }
-
-  const { primaryColor, backgroundColor, textColor, accentColor } = countdown.theme;
+  const isCountingToStart = countdown.status === "not_started";
+  const isEnded = countdown.status === "ended";
+  const isPaused = countdown.isPaused;
 
   return (
     <div
-      className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-8 relative overflow-hidden"
-      style={{ backgroundColor }}
+      className="min-h-screen flex flex-col items-center justify-center p-6 sm:p-8 relative overflow-hidden"
+      style={{ backgroundColor, color: textColor }}
     >
-      {/* Animated background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <motion.div
-          className="absolute -top-1/2 -left-1/2 w-full h-full rounded-full blur-3xl opacity-20"
-          style={{ backgroundColor: primaryColor }}
-          animate={{
-            x: [0, 100, 0],
-            y: [0, 50, 0],
-            scale: [1, 1.2, 1],
-          }}
-          transition={{ duration: 20, repeat: Infinity, ease: "easeInOut" }}
-        />
-        <motion.div
-          className="absolute -bottom-1/2 -right-1/2 w-full h-full rounded-full blur-3xl opacity-15"
-          style={{ backgroundColor: accentColor }}
-          animate={{
-            x: [0, -100, 0],
-            y: [0, -50, 0],
-            scale: [1.2, 1, 1.2],
-          }}
-          transition={{ duration: 25, repeat: Infinity, ease: "easeInOut" }}
-        />
-      </div>
+      {/* Subtle gradient overlay */}
+      <div
+        className="absolute inset-0 opacity-30"
+        style={{
+          background: `radial-gradient(ellipse at 50% 0%, ${primaryColor}15 0%, transparent 50%),
+                       radial-gradient(ellipse at 50% 100%, ${accentColor}10 0%, transparent 50%)`,
+        }}
+      />
 
-      {/* Content */}
-      <div className="relative z-10 flex flex-col items-center w-full max-w-7xl">
+      <div className="relative z-10 flex flex-col items-center w-full max-w-5xl">
         {/* Event Name */}
         <motion.h1
-          className="text-4xl sm:text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-2"
-          style={{ color: textColor }}
-          initial={{ y: -50, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          transition={{ duration: 0.8 }}
+          className="text-4xl sm:text-5xl md:text-6xl font-black tracking-tight text-center"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
         >
           {countdown.eventName}
         </motion.h1>
 
-        {/* Status Badge */}
+        {/* Status */}
         <motion.div
-          className={twMerge(
-            "px-6 py-2 rounded-full mb-8 sm:mb-12 font-semibold text-sm sm:text-base uppercase tracking-wider",
-            countdown.isPaused && "animate-pulse"
-          )}
-          style={{
-            backgroundColor: countdown.isPaused
-              ? `${accentColor}30`
-              : countdown.status === "running"
-              ? `${primaryColor}30`
-              : `${textColor}20`,
-            color: countdown.isPaused
-              ? accentColor
-              : countdown.status === "running"
-              ? primaryColor
-              : textColor,
-            border: `1px solid ${
-              countdown.isPaused
-                ? accentColor
-                : countdown.status === "running"
-                ? primaryColor
-                : textColor
-            }40`,
-          }}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ delay: 0.3, type: "spring" }}
+          className="mt-4 mb-10 sm:mb-14"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.2 }}
         >
-          {countdown.isPaused && <Pause className="inline w-4 h-4 mr-2" />}
-          {countdown.status === "not_started"
-            ? "Starting Soon"
-            : countdown.status === "paused"
-            ? countdown.pauseReason || "Paused"
-            : countdown.status === "ended"
-            ? "Event Ended"
-            : "Live"}
+          <div
+            className="px-5 py-2 rounded-full text-sm font-semibold uppercase tracking-wider flex items-center gap-2"
+            style={{
+              backgroundColor: isPaused ? `${accentColor}20` : isEnded ? `${primaryColor}20` : `${textColor}10`,
+              color: isPaused ? accentColor : isEnded ? primaryColor : textColor,
+              border: `1px solid ${isPaused ? accentColor : isEnded ? primaryColor : textColor}20`,
+            }}
+          >
+            {isPaused && <Pause className="w-3.5 h-3.5" />}
+            {isCountingToStart ? "Starting Soon" : isPaused ? (countdown.pauseReason || "Paused") : isEnded ? "Ended" : "Live"}
+          </div>
         </motion.div>
 
-        {/* Countdown Timer */}
-        {countdown.status !== "ended" ? (
+        {/* Timer */}
+        {!isEnded ? (
           <motion.div
-            className="flex items-center justify-center flex-wrap gap-2 sm:gap-4"
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.5, duration: 0.5 }}
+            className="flex items-start justify-center"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
           >
             {timeRemaining.days > 0 && (
               <>
-                <TimeUnit
-                  value={timeRemaining.days}
-                  label="Days"
-                  primaryColor={primaryColor}
-                  textColor={textColor}
-                />
-                <Separator color={primaryColor} />
+                <TimeUnit value={timeRemaining.days} label="Days" />
+                <Separator />
               </>
             )}
-            <TimeUnit
-              value={timeRemaining.hours}
-              label="Hours"
-              primaryColor={primaryColor}
-              textColor={textColor}
-            />
-            <Separator color={primaryColor} />
-            <TimeUnit
-              value={timeRemaining.minutes}
-              label="Minutes"
-              primaryColor={primaryColor}
-              textColor={textColor}
-            />
-            <Separator color={primaryColor} />
-            <TimeUnit
-              value={timeRemaining.seconds}
-              label="Seconds"
-              primaryColor={primaryColor}
-              textColor={textColor}
-            />
+            <TimeUnit value={timeRemaining.hours} label="Hours" />
+            <Separator />
+            <TimeUnit value={timeRemaining.minutes} label="Minutes" />
+            <Separator />
+            <TimeUnit value={timeRemaining.seconds} label="Seconds" />
           </motion.div>
         ) : (
           <motion.div
-            className="text-4xl sm:text-6xl font-bold"
-            style={{ color: primaryColor }}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
+            className="text-center"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
           >
-            🎉 Event Complete! 🎉
+            <div className="text-6xl sm:text-7xl md:text-8xl font-black" style={{ color: primaryColor }}>
+              Complete!
+            </div>
+          </motion.div>
+        )}
+
+        {/* Progress bar for running event */}
+        {countdown.status === "running" && (
+          <motion.div
+            className="w-full max-w-md mt-12"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            <div className="h-1.5 rounded-full overflow-hidden" style={{ backgroundColor: `${textColor}10` }}>
+              <motion.div
+                className="h-full rounded-full"
+                style={{ backgroundColor: primaryColor }}
+                initial={{ width: 0 }}
+                animate={{ width: `${timeRemaining.progress}%` }}
+                transition={{ duration: 0.5 }}
+              />
+            </div>
+            <div className="flex justify-between mt-2 text-xs opacity-50">
+              <span>{formatDuration(timeRemaining.elapsed)}</span>
+              <span>{formatDuration(countdown.duration)}</span>
+            </div>
           </motion.div>
         )}
 
         {/* Message */}
-        <AnimatePresence>
-          {countdown.showMessage && countdown.message && (
-            <motion.p
-              className="mt-12 text-lg sm:text-xl md:text-2xl text-center max-w-2xl opacity-80"
-              style={{ color: textColor }}
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 0.8 }}
-              exit={{ y: 20, opacity: 0 }}
-            >
-              {countdown.message}
-            </motion.p>
-          )}
-        </AnimatePresence>
-
-        {/* Started At Info */}
-        {countdown.startedAt && (
+        {countdown.showMessage && countdown.message && (
           <motion.p
-            className="mt-8 text-sm opacity-50"
-            style={{ color: textColor }}
+            className="mt-10 text-lg sm:text-xl text-center max-w-xl opacity-70"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.5 }}
+            animate={{ opacity: 0.7 }}
+            transition={{ delay: 0.6 }}
           >
-            Started at:{" "}
-            {new Date(countdown.startedAt).toLocaleString("en-US", {
-              dateStyle: "medium",
-              timeStyle: "short",
-            })}
+            {countdown.message}
           </motion.p>
         )}
 
-        {/* Pause Info */}
-        {countdown.isPaused && countdown.pausedAt && (
+        {/* Info */}
+        {countdown.startedAt && (
           <motion.div
-            className="mt-4 px-6 py-3 rounded-xl"
-            style={{
-              backgroundColor: `${accentColor}20`,
-              border: `1px solid ${accentColor}40`,
-            }}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
+            className="mt-8 text-sm opacity-40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.4 }}
           >
-            <p className="text-sm" style={{ color: accentColor }}>
-              Paused at:{" "}
-              {new Date(countdown.pausedAt).toLocaleString("en-US", {
-                dateStyle: "medium",
-                timeStyle: "short",
-              })}
-            </p>
+            Started {new Date(countdown.startedAt).toLocaleString()}
           </motion.div>
         )}
 
         {/* Footer */}
         <motion.div
-          className="absolute bottom-8 left-1/2 transform -translate-x-1/2"
+          className="fixed bottom-6 text-sm font-medium tracking-wider opacity-50"
           initial={{ opacity: 0 }}
-          animate={{ opacity: 0.6 }}
+          animate={{ opacity: 0.5 }}
           transition={{ delay: 1 }}
         >
-          <p className="text-sm font-medium tracking-wider" style={{ color: textColor }}>
-            SLIIT FOSS
-          </p>
+          SLIIT FOSS
         </motion.div>
       </div>
     </div>
   );
 }
-
