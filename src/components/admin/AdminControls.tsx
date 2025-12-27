@@ -210,13 +210,15 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
     height: 6, borderRadius: 3, showLabels: true, backgroundColor: "rgba(255,255,255,0.1)", fillColor: "#EF4444"
   });
   const [logs, setLogs] = useState<CountdownLog[]>([]);
+  const [formReady, setFormReady] = useState(false);
   
   const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const hasUserChanges = useRef(false);
-  const isInitialized = useRef(false);
+  const pendingChangesRef = useRef<Record<string, unknown>>({});
 
+  // Sync form state from DB when countdown data is loaded (not from defaults)
   useEffect(() => {
-    if (countdown && !isInitialized.current) {
+    // Only initialize form when we have real data from DB (has _id) and not loading
+    if (!loading && countdown._id) {
       setEventName(countdown.eventName || "Bashaway 2025");
       setMessage(countdown.message || "");
       setPausePrefix(countdown.pausePrefix || "Paused for");
@@ -232,44 +234,88 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
         setStartDate(date.toISOString().split("T")[0]);
         setStartTimeInput(date.toTimeString().slice(0, 5));
       }
-      isInitialized.current = true;
+      
+      // Mark form as ready only after initial data load
+      if (!formReady) {
+        setFormReady(true);
+      }
     }
-  }, [countdown]);
+  }, [loading, countdown._id]); // Only depend on loading and _id to prevent re-syncing on every countdown change
 
-  const triggerAutoSave = useCallback(() => {
-    hasUserChanges.current = true;
+  // Auto-save with refs to avoid stale closures
+  const doAutoSave = useCallback(async () => {
+    if (Object.keys(pendingChangesRef.current).length === 0) return;
     
+    try {
+      await updateSettings(pendingChangesRef.current);
+      pendingChangesRef.current = {};
+    } catch {}
+  }, [updateSettings]);
+
+  const scheduleAutoSave = useCallback(() => {
     if (autoSaveTimeoutRef.current) {
       clearTimeout(autoSaveTimeoutRef.current);
     }
-    
-    autoSaveTimeoutRef.current = setTimeout(async () => {
-      if (!hasUserChanges.current) return;
-      
-      const startDateTime = startDate && startTimeInput ? new Date(`${startDate}T${startTimeInput}`) : countdown.startTime;
-      const duration = parseDuration(durationInput) || countdown.duration;
-      
-      try {
-        await updateSettings({
-          eventName,
-          startTime: startDateTime,
-          duration,
-          message,
-          pausePrefix,
-          theme,
-          statusStyles,
-          display,
-          fonts,
-          progressBar,
-        });
-        hasUserChanges.current = false;
-      } catch {}
-    }, 1500);
-  }, [eventName, startDate, startTimeInput, durationInput, message, pausePrefix, theme, statusStyles, display, fonts, progressBar, countdown.startTime, countdown.duration, updateSettings]);
+    autoSaveTimeoutRef.current = setTimeout(doAutoSave, 1500);
+  }, [doAutoSave]);
 
-  const handleFieldChange = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, value: T) => {
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const handleFieldChange = <T,>(
+    setter: React.Dispatch<React.SetStateAction<T>>, 
+    value: T,
+    fieldName: string,
+    transformValue?: (v: T) => unknown
+  ) => {
     setter(value);
-    triggerAutoSave();
+    
+    // Don't auto-save until form is ready (initial data loaded)
+    if (!formReady) return;
+    
+    // Store the change for auto-save
+    pendingChangesRef.current[fieldName] = transformValue ? transformValue(value) : value;
+    scheduleAutoSave();
+  };
+
+  // Special handler for date/time that combines them
+  const handleDateTimeChange = (
+    type: "date" | "time",
+    value: string
+  ) => {
+    if (type === "date") {
+      setStartDate(value);
+      if (startTimeInput && value) {
+        pendingChangesRef.current.startTime = new Date(`${value}T${startTimeInput}`);
+      }
+    } else {
+      setStartTimeInput(value);
+      if (startDate && value) {
+        pendingChangesRef.current.startTime = new Date(`${startDate}T${value}`);
+      }
+    }
+    
+    if (!formReady) return;
+    scheduleAutoSave();
+  };
+
+  // Special handler for duration
+  const handleDurationChange = (value: string) => {
+    setDurationInput(value);
+    
+    if (!formReady) return;
+    
+    const parsed = parseDuration(value);
+    if (parsed) {
+      pendingChangesRef.current.duration = parsed;
+      scheduleAutoSave();
+    }
   };
 
   const fetchLogs = useCallback(async () => {
@@ -346,7 +392,10 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
       [status]: { ...statusStyles[status], [field]: value },
     };
     setStatusStyles(newStyles);
-    triggerAutoSave();
+    
+    if (!formReady) return;
+    pendingChangesRef.current.statusStyles = newStyles;
+    scheduleAutoSave();
   };
 
   if (loading) {
@@ -558,17 +607,17 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card title="Event Settings" icon={<Settings className="w-4 h-4" />}>
                   <div className="space-y-4">
-                    <BashawayInput label="Event Name" value={eventName} onChange={(v) => handleFieldChange(setEventName, v)} />
+                    <BashawayInput label="Event Name" value={eventName} onChange={(v) => handleFieldChange(setEventName, v, "eventName")} />
                     <div className="grid grid-cols-2 gap-3">
-                      <BashawayInput label="Start Date" type="date" value={startDate} onChange={(v) => handleFieldChange(setStartDate, v)} />
-                      <BashawayInput label="Start Time" type="time" value={startTimeInput} onChange={(v) => handleFieldChange(setStartTimeInput, v)} />
+                      <BashawayInput label="Start Date" type="date" value={startDate} onChange={(v) => handleDateTimeChange("date", v)} />
+                      <BashawayInput label="Start Time" type="time" value={startTimeInput} onChange={(v) => handleDateTimeChange("time", v)} />
                     </div>
-                    <BashawayInput label="Duration (e.g., 6h, 3h 30m)" value={durationInput} onChange={(v) => handleFieldChange(setDurationInput, v)} placeholder="6h" />
-                    <BashawayInput label="Display Message" value={message} onChange={(v) => handleFieldChange(setMessage, v)} placeholder="Optional message" />
+                    <BashawayInput label="Duration (e.g., 6h, 3h 30m)" value={durationInput} onChange={handleDurationChange} placeholder="6h" />
+                    <BashawayInput label="Display Message" value={message} onChange={(v) => handleFieldChange(setMessage, v, "message")} placeholder="Optional message" />
                     <BashawayDropdown
                       label="Pause Status Prefix"
                       value={pausePrefix}
-                      onChange={(v) => handleFieldChange(setPausePrefix, v)}
+                      onChange={(v) => handleFieldChange(setPausePrefix, v, "pausePrefix")}
                       options={pausePrefixOptions}
                     />
                   </div>
@@ -608,16 +657,16 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card title="Element Visibility" icon={<Eye className="w-4 h-4" />}>
                   <div className="space-y-1">
-                    <Toggle label="Show Logo" checked={display.showLogo} onChange={(v) => handleFieldChange(setDisplay, { ...display, showLogo: v })} />
-                    <Toggle label="Show Event Name" checked={display.showEventName} onChange={(v) => handleFieldChange(setDisplay, { ...display, showEventName: v })} />
-                    <Toggle label="Show Status Badge" checked={display.showStatus} onChange={(v) => handleFieldChange(setDisplay, { ...display, showStatus: v })} />
-                    <Toggle label="Show Timer" checked={display.showTimer} onChange={(v) => handleFieldChange(setDisplay, { ...display, showTimer: v })} />
-                    <Toggle label="Show Progress Bar" checked={display.showProgressBar} onChange={(v) => handleFieldChange(setDisplay, { ...display, showProgressBar: v })} />
-                    <Toggle label="Show Message" checked={display.showMessage} onChange={(v) => handleFieldChange(setDisplay, { ...display, showMessage: v })} />
-                    <Toggle label="Show Started At" checked={display.showStartedAt} onChange={(v) => handleFieldChange(setDisplay, { ...display, showStartedAt: v })} />
-                    <Toggle label="Show End Time" checked={display.showEndTime} onChange={(v) => handleFieldChange(setDisplay, { ...display, showEndTime: v })} />
-                    <Toggle label="Show Elapsed Time" checked={display.showElapsed} onChange={(v) => handleFieldChange(setDisplay, { ...display, showElapsed: v })} />
-                    <Toggle label="Show Footer" checked={display.showFooter} onChange={(v) => handleFieldChange(setDisplay, { ...display, showFooter: v })} />
+                    <Toggle label="Show Logo" checked={display.showLogo} onChange={(v) => handleFieldChange(setDisplay, { ...display, showLogo: v }, "display")} />
+                    <Toggle label="Show Event Name" checked={display.showEventName} onChange={(v) => handleFieldChange(setDisplay, { ...display, showEventName: v }, "display")} />
+                    <Toggle label="Show Status Badge" checked={display.showStatus} onChange={(v) => handleFieldChange(setDisplay, { ...display, showStatus: v }, "display")} />
+                    <Toggle label="Show Timer" checked={display.showTimer} onChange={(v) => handleFieldChange(setDisplay, { ...display, showTimer: v }, "display")} />
+                    <Toggle label="Show Progress Bar" checked={display.showProgressBar} onChange={(v) => handleFieldChange(setDisplay, { ...display, showProgressBar: v }, "display")} />
+                    <Toggle label="Show Message" checked={display.showMessage} onChange={(v) => handleFieldChange(setDisplay, { ...display, showMessage: v }, "display")} />
+                    <Toggle label="Show Started At" checked={display.showStartedAt} onChange={(v) => handleFieldChange(setDisplay, { ...display, showStartedAt: v }, "display")} />
+                    <Toggle label="Show End Time" checked={display.showEndTime} onChange={(v) => handleFieldChange(setDisplay, { ...display, showEndTime: v }, "display")} />
+                    <Toggle label="Show Elapsed Time" checked={display.showElapsed} onChange={(v) => handleFieldChange(setDisplay, { ...display, showElapsed: v }, "display")} />
+                    <Toggle label="Show Footer" checked={display.showFooter} onChange={(v) => handleFieldChange(setDisplay, { ...display, showFooter: v }, "display")} />
                   </div>
                 </Card>
 
@@ -626,13 +675,13 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
                     <BashawayInput
                       label="Completed Title"
                       value={display.completedTitle}
-                      onChange={(v) => handleFieldChange(setDisplay, { ...display, completedTitle: v })}
+                      onChange={(v) => handleFieldChange(setDisplay, { ...display, completedTitle: v }, "display")}
                       placeholder="Event Complete!"
                     />
                     <BashawayInput
                       label="Completed Subtitle"
                       value={display.completedSubtitle}
-                      onChange={(v) => handleFieldChange(setDisplay, { ...display, completedSubtitle: v })}
+                      onChange={(v) => handleFieldChange(setDisplay, { ...display, completedSubtitle: v }, "display")}
                       placeholder="Thank you for participating"
                     />
                   </div>
@@ -644,13 +693,13 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
                       label="Height (px)"
                       type="number"
                       value={progressBar.height?.toString() || "6"}
-                      onChange={(v) => handleFieldChange(setProgressBar, { ...progressBar, height: parseInt(v) || 6 })}
+                      onChange={(v) => handleFieldChange(setProgressBar, { ...progressBar, height: parseInt(v) || 6 }, "progressBar")}
                     />
                     <BashawayInput
                       label="Border Radius (px)"
                       type="number"
                       value={progressBar.borderRadius?.toString() || "3"}
-                      onChange={(v) => handleFieldChange(setProgressBar, { ...progressBar, borderRadius: parseInt(v) || 3 })}
+                      onChange={(v) => handleFieldChange(setProgressBar, { ...progressBar, borderRadius: parseInt(v) || 3 }, "progressBar")}
                     />
                     <div>
                       <label className="block text-sm text-black/60 mb-1.5">Fill Color</label>
@@ -658,13 +707,13 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
                         <input
                           type="color"
                           value={progressBar.fillColor || "#EF4444"}
-                          onChange={(e) => handleFieldChange(setProgressBar, { ...progressBar, fillColor: e.target.value })}
+                          onChange={(e) => handleFieldChange(setProgressBar, { ...progressBar, fillColor: e.target.value }, "progressBar")}
                           className="w-12 h-10 rounded cursor-pointer border border-black/10"
                         />
                         <input
                           type="text"
                           value={progressBar.fillColor || "#EF4444"}
-                          onChange={(e) => handleFieldChange(setProgressBar, { ...progressBar, fillColor: e.target.value })}
+                          onChange={(e) => handleFieldChange(setProgressBar, { ...progressBar, fillColor: e.target.value }, "progressBar")}
                           className="flex-1 h-full px-3 bg-white border border-black/20 rounded-md text-sm font-mono focus:outline-none focus:border-black"
                         />
                       </div>
@@ -673,7 +722,7 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
                       <Toggle
                         label="Show Labels"
                         checked={progressBar.showLabels ?? true}
-                        onChange={(v) => handleFieldChange(setProgressBar, { ...progressBar, showLabels: v })}
+                        onChange={(v) => handleFieldChange(setProgressBar, { ...progressBar, showLabels: v }, "progressBar")}
                       />
                     </div>
                   </div>
@@ -693,10 +742,10 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <Card title="Base Colors" icon={<Palette className="w-4 h-4" />}>
                   <div className="space-y-4">
-                    <ColorInput label="Primary" value={theme.primaryColor} onChange={(v) => handleFieldChange(setTheme, { ...theme, primaryColor: v })} />
-                    <ColorInput label="Background" value={theme.backgroundColor} onChange={(v) => handleFieldChange(setTheme, { ...theme, backgroundColor: v })} />
-                    <ColorInput label="Text" value={theme.textColor} onChange={(v) => handleFieldChange(setTheme, { ...theme, textColor: v })} />
-                    <ColorInput label="Accent" value={theme.accentColor} onChange={(v) => handleFieldChange(setTheme, { ...theme, accentColor: v })} />
+                    <ColorInput label="Primary" value={theme.primaryColor} onChange={(v) => handleFieldChange(setTheme, { ...theme, primaryColor: v }, "theme")} />
+                    <ColorInput label="Background" value={theme.backgroundColor} onChange={(v) => handleFieldChange(setTheme, { ...theme, backgroundColor: v }, "theme")} />
+                    <ColorInput label="Text" value={theme.textColor} onChange={(v) => handleFieldChange(setTheme, { ...theme, textColor: v }, "theme")} />
+                    <ColorInput label="Accent" value={theme.accentColor} onChange={(v) => handleFieldChange(setTheme, { ...theme, accentColor: v }, "theme")} />
                   </div>
                 </Card>
 
@@ -757,25 +806,25 @@ export default function AdminControls({ onLogout }: AdminControlsProps) {
                   <BashawayInput
                     label="Event Name Font"
                     value={fonts.eventName}
-                    onChange={(v) => handleFieldChange(setFonts, { ...fonts, eventName: v })}
+                    onChange={(v) => handleFieldChange(setFonts, { ...fonts, eventName: v }, "fonts")}
                     placeholder="system-ui, sans-serif"
                   />
                   <BashawayInput
                     label="Timer Font"
                     value={fonts.timer}
-                    onChange={(v) => handleFieldChange(setFonts, { ...fonts, timer: v })}
+                    onChange={(v) => handleFieldChange(setFonts, { ...fonts, timer: v }, "fonts")}
                     placeholder="'SF Mono', monospace"
                   />
                   <BashawayInput
                     label="Labels Font"
                     value={fonts.labels}
-                    onChange={(v) => handleFieldChange(setFonts, { ...fonts, labels: v })}
+                    onChange={(v) => handleFieldChange(setFonts, { ...fonts, labels: v }, "fonts")}
                     placeholder="system-ui, sans-serif"
                   />
                   <BashawayInput
                     label="Message Font"
                     value={fonts.message}
-                    onChange={(v) => handleFieldChange(setFonts, { ...fonts, message: v })}
+                    onChange={(v) => handleFieldChange(setFonts, { ...fonts, message: v }, "fonts")}
                     placeholder="system-ui, sans-serif"
                   />
                 </div>
